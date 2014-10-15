@@ -3,19 +3,24 @@
 	function defined(name) {
 		return Object.prototype.hasOwnProperty.call(modules, name);
 	}
+    function fail(msg) {
+        throw new Error(msg);
+    }
 	function define(name, deps, factory) {
-		if (defined(name)) throw new Error("Multiple modules with name " + name);
-		modules[name] = { deps: deps, factory: factory, state: 0, module: null }
+		if (defined(name)) fail("Multiple modules with name " + name);
+        var state = 0, module = null;
+		modules[name] = function() {
+            if (state > 1) return module;
+            if (state > 0) fail("Circular dependency including " + name);
+            state = 1;
+            module = factory.apply(undef, deps.map(require));
+            state = 2;
+            return module;
+        };
 	}
 	function require(name) {
-		if (!defined(name)) throw new Error("Undefined module " + name);
-		var module = modules[name];
-		if (module.state === 2) return module.module;
-		if (module.state === 1) throw new Error("Circular dependency including " + name);
-		module.state = 1;
-		module.module = module.factory.apply(undef, module.deps.map(require));
-		module.state = 2;
-		return module.module;
+		if (!defined(name)) fail("Undefined module " + name);
+		return modules[name]();
 	}
 	context.define = define;
 	context.require = require;
